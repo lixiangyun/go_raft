@@ -1,7 +1,7 @@
 package main
 
 import (
-	"golang_demo/raft/src"
+	"go_raft/src"
 	"log"
 	"os"
 	"time"
