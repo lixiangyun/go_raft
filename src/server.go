@@ -83,8 +83,8 @@ func (r *RAFT) RequestVote(l *LeaderInfo, b *bool) error {
 				r.leader = l.ServerName
 				r.role = ROLE_FOLLOWER
 				r.curTerm = l.Term
-
 				r.timeout.Reset(GetDymicTimeOut())
+
 				log.Println("change role to follower from Leader :", l.ServerName)
 
 				*b = true
@@ -97,6 +97,21 @@ func (r *RAFT) RequestVote(l *LeaderInfo, b *bool) error {
 			if l.Term >= r.curTerm && r.leader == "" {
 
 				r.leader = l.ServerName
+				r.curTerm = l.Term
+				r.timeout.Reset(GetDymicTimeOut())
+
+				log.Println("agree new Leader :", l.ServerName)
+				*b = true
+			} else {
+				log.Printf("RequestVote Name : %s , Role: %s , Term %d , Leader %s \r\n", r.name, r.role, r.curTerm, r.leader)
+			}
+		}
+	case ROLE_LEADER:
+		{
+			if l.Term > r.curTerm {
+
+				r.leader = l.ServerName
+				r.role = ROLE_FOLLOWER
 				r.curTerm = l.Term
 				r.timeout.Reset(GetDymicTimeOut())
 
