@@ -24,6 +24,7 @@ type Cluster struct {
 	lock  *sync.Mutex
 	wait  *sync.WaitGroup
 	timer *time.Timer
+	flag  bool
 }
 
 func NewCluster() *Cluster {
@@ -34,6 +35,7 @@ func NewCluster() *Cluster {
 	c.wait = new(sync.WaitGroup)
 	c.node = make(map[string]*Node)
 	c.timer = time.NewTimer(PING_TIMEOUT)
+	c.flag = true
 
 	go KeepConnect(c)
 
@@ -43,9 +45,6 @@ func NewCluster() *Cluster {
 }
 
 func (c *Cluster) Close() {
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
 
 	for _, node := range c.node {
 		if node == nil {
@@ -62,7 +61,15 @@ func (c *Cluster) Close() {
 		}
 	}
 
+	log.Println("close connect.")
+
+	c.timer.Reset(0)
+
+	log.Println("close timer.")
+
 	c.wait.Wait()
+
+	log.Println("close cluster.")
 }
 
 func (c *Cluster) AddNode(name string) {
@@ -106,11 +113,17 @@ func (c *Cluster) DelNode(name string) {
 
 func KeepConnect(c *Cluster) {
 
+	defer log.Println("keep connect close.")
+
 	defer c.wait.Done()
 
 	for {
 		_, b := <-c.timer.C
 		if b == false {
+			return
+		}
+
+		if c.flag == false {
 			return
 		}
 
@@ -124,6 +137,8 @@ func KeepConnect(c *Cluster) {
 				log.Println(err.Error())
 				continue
 			}
+
+			log.Println("build a new connect with ", node.name)
 
 			c.lock.Lock()
 			node.client = client

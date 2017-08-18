@@ -1,29 +1,11 @@
 package main
 
 import (
-	"crypto/rand"
 	"go_raft/src"
 	"log"
 	"os"
 	"time"
 )
-
-func getRandInt() int {
-
-	var buf [100]byte
-	var val int
-
-	for i := 0; i < 100; i++ {
-		_, err := rand.Read(buf[0:])
-		if err != nil {
-			val += time.Now().Nanosecond()
-		} else {
-			val += int(buf[0]) + int(buf[1])<<8 + int(buf[2])<<16 + int(buf[3])<<24
-		}
-	}
-
-	return val
-}
 
 func main() {
 
@@ -48,7 +30,7 @@ func main() {
 	log.Println("Server start ok!")
 
 	// for test
-	val := (getRandInt() % 100) + 10
+	val := (raft.GetRandInt() % 100) + 10
 
 	log.Println("proccess maybe exit at ", val, " second laster.")
 
@@ -61,5 +43,5 @@ func main() {
 
 	log.Println("Server stop ok!")
 
-	//raft.Stop(r)
+	raft.Stop(r)
 }

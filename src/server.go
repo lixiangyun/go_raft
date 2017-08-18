@@ -47,19 +47,26 @@ type RAFT struct {
 	wait    *sync.WaitGroup
 }
 
-func GetDymicTimeOut() time.Duration {
+func GetRandInt() int {
 
-	var buf [4]byte
+	var buf [100]byte
 	var val int
 
-	_, err := rand.Read(buf[0:])
-	if err != nil {
-		val = time.Now().Nanosecond()
-	} else {
-		val = int(buf[0]) + int(buf[1])<<8 + int(buf[2])<<16 + int(buf[3])<<24
+	for i := 0; i < 100; i++ {
+		_, err := rand.Read(buf[0:])
+		if err != nil {
+			val += time.Now().Nanosecond()
+		} else {
+			val += int(buf[0]) + int(buf[1])<<8 + int(buf[2])<<16 + int(buf[3])<<24
+		}
 	}
 
-	val = val % 3000
+	return val
+}
+
+func GetDymicTimeOut() time.Duration {
+
+	val := GetRandInt() % 3000
 
 	log.Println("val : ", val)
 
@@ -213,7 +220,6 @@ func NewRaft(selfaddr string, otheraddr []string) (*RAFT, error) {
 	r.port = selfaddr[idx+1:]
 	r.role = ROLE_FOLLOWER
 	r.votecnt = 0
-
 	r.otherserver = NewCluster()
 
 	for _, v := range otheraddr {
@@ -221,7 +227,6 @@ func NewRaft(selfaddr string, otheraddr []string) (*RAFT, error) {
 	}
 
 	r.wait = new(sync.WaitGroup)
-
 	r.mlock = new(sync.Mutex)
 
 	return r, nil
