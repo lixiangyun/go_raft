@@ -61,5 +61,5 @@ func main() {
 
 	log.Println("Server stop ok!")
 
-	raft.Stop(r)
+	//raft.Stop(r)
 }
