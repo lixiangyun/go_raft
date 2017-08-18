@@ -61,6 +61,8 @@ func (c *Cluster) Close() {
 		}
 	}
 
+	c.flag = false
+
 	log.Println("close connect.")
 
 	c.timer.Reset(0)

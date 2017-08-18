@@ -4,6 +4,13 @@ import (
 	"log"
 )
 
+const (
+	CHANGE_ROLE_F_TO_C = 1
+	CHANGE_ROLE_C_TO_L = 2
+	CHANGE_ROLE_L_TO_F = 3
+	CHANGE_ROLE_C_TO_F = 4
+)
+
 func TimeOut(r *RAFT) {
 
 	log.Println("Timer Start ")
@@ -43,6 +50,10 @@ func TimeOut(r *RAFT) {
 			return
 		}
 	}
+}
+
+func ChangeRole_F_TO_C(r *RAFT) {
+
 }
 
 func KeepAlive(r *RAFT) {
