@@ -28,12 +28,14 @@ type LeaderInfo struct {
 	Term       uint64
 }
 
-type RAFT struct {
-	role    string
-	port    string
-	name    string
-	curTerm uint64
+var debug bool
 
+type RAFT struct {
+	role string
+	port string
+	name string
+
+	curTerm uint64
 	leader  string
 	votecnt int
 
@@ -44,7 +46,14 @@ type RAFT struct {
 
 	timeout *time.Timer
 	mlock   *sync.Mutex
-	wait    *sync.WaitGroup
+
+	wait *sync.WaitGroup
+}
+
+func Log(v ...interface{}) {
+	if debug == true {
+		log.Println(v)
+	}
 }
 
 func GetRandInt() int {
@@ -52,30 +61,25 @@ func GetRandInt() int {
 	var buf [100]byte
 	var val int
 
-	for i := 0; i < 100; i++ {
-		_, err := rand.Read(buf[0:])
-		if err != nil {
-			val += time.Now().Nanosecond()
-		} else {
-			val += int(buf[0]) + int(buf[1])<<8 + int(buf[2])<<16 + int(buf[3])<<24
-		}
+	rand.Read(buf[0:])
+
+	for i := 0; i < 25; i++ {
+		val += int(buf[i*4]) + int(buf[i*4+1])<<8 + int(buf[i*4+2])<<16 + int(buf[i*4+3])<<24
 	}
 
 	return val
 }
 
-func GetDymicTimeOut() time.Duration {
-
+func GetDymicTimeOut() (tm time.Duration) {
 	val := GetRandInt() % 3000
-
-	log.Println("val : ", val)
-
-	return 3*time.Second + time.Duration(val)*time.Millisecond
+	tm = 3*time.Second + time.Duration(val)*time.Millisecond
+	Log("get timeout length : ", tm.Seconds())
+	return
 }
 
 func (r *RAFT) RequestVote(l *LeaderInfo, b *bool) error {
 
-	log.Println("Recv RequestVote from Leader :", l.ServerName)
+	Log("new leader vote request for :", l.ServerName)
 
 	r.mlock.Lock()
 	defer r.mlock.Unlock()
@@ -85,71 +89,55 @@ func (r *RAFT) RequestVote(l *LeaderInfo, b *bool) error {
 	switch r.role {
 	case ROLE_CANDIDATE:
 		{
-			if l.Term >= r.curTerm && r.leader == "" {
-
-				r.leader = l.ServerName
-				r.role = ROLE_FOLLOWER
-				r.curTerm = l.Term
-				r.timeout.Reset(GetDymicTimeOut())
-
-				log.Println("change role to follower from Leader :", l.ServerName)
-
+			if l.Term >= r.curTerm {
 				*b = true
-			} else {
-				log.Printf("RequestVote Name : %s , Role: %s , Term %d , Leader %s \r\n", r.name, r.role, r.curTerm, r.leader)
 			}
 		}
 	case ROLE_FOLLOWER:
 		{
-			if l.Term >= r.curTerm && r.leader == "" {
-
-				r.leader = l.ServerName
-				r.curTerm = l.Term
-				r.timeout.Reset(GetDymicTimeOut())
-
-				log.Println("agree new Leader :", l.ServerName)
+			if l.Term >= r.curTerm {
 				*b = true
-			} else {
-				log.Printf("RequestVote Name : %s , Role: %s , Term %d , Leader %s \r\n", r.name, r.role, r.curTerm, r.leader)
 			}
 		}
 	case ROLE_LEADER:
 		{
 			if l.Term > r.curTerm {
-
-				r.leader = l.ServerName
-				r.role = ROLE_FOLLOWER
-				r.curTerm = l.Term
-				r.timeout.Reset(GetDymicTimeOut())
-
-				log.Println("agree new Leader :", l.ServerName)
 				*b = true
-			} else {
-				log.Printf("RequestVote Name : %s , Role: %s , Term %d , Leader %s \r\n", r.name, r.role, r.curTerm, r.leader)
 			}
 		}
 	}
+
+	if *b == true {
+
+		r.leader = l.ServerName
+		r.role = ROLE_FOLLOWER
+		r.curTerm = l.Term
+
+		r.timeout.Reset(GetDymicTimeOut())
+
+		Log("agree new Leader :", l.ServerName)
+
+	} else {
+		Log("not agree vote for leader :", l.ServerName)
+	}
+
 	return nil
 }
 
 func (r *RAFT) AppendEntries(l *LeaderInfo, b *bool) error {
 
-	log.Println("Recv AppendEntries from Leader :", l.ServerName)
-
 	r.mlock.Lock()
 	defer r.mlock.Unlock()
 
-	*b = false
-	if r.role == ROLE_FOLLOWER {
-		if r.leader == l.ServerName {
-			r.timeout.Reset(GetDymicTimeOut())
-			log.Println("agree append entries request from Leader :", l.ServerName)
-			*b = true
-		} else {
-			log.Printf("AppendEntries Name : %s , Role: %s , Term %d , Leader %s \r\n", r.name, r.role, r.curTerm, r.leader)
-		}
+	if r.role == ROLE_FOLLOWER && r.leader == l.ServerName {
+		r.timeout.Reset(GetDymicTimeOut())
+
+		*b = true
+		Log("agree append entries request from Leader :", l.ServerName)
 	} else {
-		log.Printf("AppendEntries Name : %s , Role: %s , Term %d , Leader %s \r\n", r.name, r.role, r.curTerm, r.leader)
+
+		*b = false
+		Log("reject append entries request from Leader :", l.ServerName)
 	}
 
 	return nil
@@ -157,8 +145,6 @@ func (r *RAFT) AppendEntries(l *LeaderInfo, b *bool) error {
 
 func (r *RAFT) Heartbeats(l *LeaderInfo, b *bool) error {
 
-	log.Println("Recv Heartbeats from Leader :", l.ServerName)
-
 	*b = false
 
 	r.mlock.Lock()
@@ -167,41 +153,246 @@ func (r *RAFT) Heartbeats(l *LeaderInfo, b *bool) error {
 	switch r.role {
 	case ROLE_FOLLOWER:
 		{
-			if l.ServerName == r.leader {
-
-				r.timeout.Reset(GetDymicTimeOut())
-				log.Println("Get Heartbeats from Leader :", l.ServerName)
-
+			if l.Term >= r.curTerm {
 				*b = true
 			}
 		}
 	case ROLE_CANDIDATE:
 		{
 			if l.Term >= r.curTerm {
-
-				r.role = ROLE_FOLLOWER
-				r.leader = l.ServerName
-				r.curTerm = l.Term
-				r.timeout.Reset(GetDymicTimeOut())
-
-				log.Println("follower new Leader :", l.ServerName)
+				*b = true
 			}
 		}
 	case ROLE_LEADER:
 		{
 			if l.Term > r.curTerm {
-
-				r.role = ROLE_FOLLOWER
-				r.leader = l.ServerName
-				r.curTerm = l.Term
-				r.timeout.Reset(GetDymicTimeOut())
-
-				log.Println("follower new Leader :", l.ServerName)
+				*b = true
 			}
 		}
 	}
 
+	if *b == true {
+
+		r.role = ROLE_FOLLOWER
+		r.leader = l.ServerName
+		r.curTerm = l.Term
+
+		r.timeout.Reset(GetDymicTimeOut())
+
+		Log("agree heartbeats from leader ", l.ServerName)
+	} else {
+
+		Log("reject heartbeats from Leader :", l.ServerName)
+	}
+
 	return nil
+}
+
+func TimeOut(r *RAFT) {
+
+	Log("Timer Start ")
+
+	defer r.wait.Done()
+	defer Log("Timer Close")
+
+	for {
+		_, b := <-r.timeout.C
+		if b == false {
+			return
+		}
+
+		Log("[name: %s , role: %s , term: %d , leader: %s]", r.name, r.role, r.curTerm, r.leader)
+
+		switch r.role {
+		case ROLE_LEADER:
+			{
+				KeepAlive(r)
+			}
+		case ROLE_CANDIDATE:
+			{
+				LeaderVote(r)
+			}
+		case ROLE_FOLLOWER:
+			{
+				r.mlock.Lock()
+				r.role = ROLE_CANDIDATE
+				r.leader = ""
+				r.curTerm++
+				r.mlock.Unlock()
+
+				LeaderVote(r)
+			}
+		default:
+			Log("Recv Stop Raft")
+			return
+		}
+	}
+}
+
+func KeepAlive(r *RAFT) {
+
+	Log("keep alive start")
+
+	totalnum := len(r.othername)
+	queue := make(chan bool, totalnum)
+
+	for _, othername := range r.othername {
+
+		go func(name string) {
+
+			request := new(LeaderInfo)
+			response := new(bool)
+
+			request.ServerName = r.name
+			request.Term = r.curTerm
+
+			err := r.otherserver.SyncCall(name, "RAFT.Heartbeats", request, response, RPC_TIMEOUT)
+			if err != nil {
+				Log(err.Error())
+				queue <- false
+				return
+			}
+			Log("recv heartbeats ", name, *response)
+			if *response {
+				queue <- true
+			} else {
+				queue <- false
+			}
+		}(othername)
+	}
+
+	agreenum := 0
+	for i := 0; i < totalnum; i++ {
+		response := <-queue
+		if response == true {
+			agreenum++
+		}
+	}
+
+	close(queue)
+
+	r.mlock.Lock()
+
+	if agreenum == 0 {
+		r.leader = ""
+		r.role = ROLE_FOLLOWER
+		r.timeout.Reset(GetDymicTimeOut())
+
+		Log("not any partner response")
+
+	} else {
+		r.timeout.Reset(KEEP_ALIVE)
+
+		Log("get ", agreenum, " partners response")
+	}
+
+	r.mlock.Unlock()
+}
+
+func LeaderVote(r *RAFT) {
+
+	Log("start vote for leader ", r.name)
+
+	r.mlock.Lock()
+	if r.leader != "" {
+		r.mlock.Unlock()
+
+		Log("stop vote for leader ", r.leader)
+		return
+	}
+	r.leader = r.name
+	r.mlock.Unlock()
+
+	totalnum := len(r.othername)
+	queue := make(chan bool, totalnum)
+
+	for _, othername := range r.othername {
+
+		go func(name string) {
+
+			request := new(LeaderInfo)
+			response := new(bool)
+
+			request.ServerName = r.name
+			request.Term = r.curTerm
+
+			err := r.otherserver.SyncCall(name, "RAFT.RequestVote", request, response, RPC_TIMEOUT)
+			if err != nil {
+				Log(err.Error())
+				queue <- false
+				return
+			}
+
+			Log("recv request vote ", name, *response)
+			if *response {
+				queue <- true
+			} else {
+				queue <- false
+			}
+		}(othername)
+	}
+
+	for i := 0; i < totalnum; i++ {
+		<-queue
+	}
+
+	for _, othername := range r.othername {
+
+		go func(name string) {
+
+			request := new(LeaderInfo)
+			response := new(bool)
+
+			request.ServerName = r.name
+			request.Term = r.curTerm
+
+			err := r.otherserver.SyncCall(name, "RAFT.AppendEntries", request, response, RPC_TIMEOUT)
+			if err != nil {
+				Log(err.Error())
+				queue <- false
+				return
+			}
+
+			Log("recv append entries ", name, *response)
+			if *response {
+				queue <- true
+			} else {
+				queue <- false
+			}
+		}(othername)
+	}
+
+	agreenum := 0
+	for i := 0; i < totalnum; i++ {
+		response := <-queue
+		if response == true {
+			agreenum++
+		}
+	}
+
+	close(queue)
+
+	if agreenum*2 >= totalnum {
+
+		r.mlock.Lock()
+		r.role = ROLE_LEADER
+		r.timeout.Reset(KEEP_ALIVE)
+		r.mlock.Unlock()
+
+		Log("leader vote success! ")
+	} else {
+
+		r.mlock.Lock()
+		r.leader = ""
+		r.timeout.Reset(GetDymicTimeOut())
+		r.mlock.Unlock()
+
+		Log("leader vote failed! not enough partners. totalnum: ", totalnum, " agreenum: ", agreenum)
+	}
+}
+
+func Debug(b bool) {
+	debug = b
 }
 
 func NewRaft(selfaddr string, otheraddr []string) (*RAFT, error) {
@@ -213,14 +404,16 @@ func NewRaft(selfaddr string, otheraddr []string) (*RAFT, error) {
 
 	r := new(RAFT)
 
-	r.curTerm = 0
-	r.leader = ""
 	r.name = selfaddr
-	r.othername = otheraddr
 	r.port = selfaddr[idx+1:]
 	r.role = ROLE_FOLLOWER
+
+	r.curTerm = 0
+	r.leader = ""
 	r.votecnt = 0
+
 	r.otherserver = NewCluster()
+	r.othername = otheraddr
 
 	for _, v := range otheraddr {
 		r.otherserver.AddNode(v)
@@ -234,13 +427,13 @@ func NewRaft(selfaddr string, otheraddr []string) (*RAFT, error) {
 
 func Start(r *RAFT) error {
 
-	log.Println("Server Start")
+	Log("server start listen")
 
 	server := rpc.NewServer()
 
 	err := server.Register(r)
 	if err != nil {
-		log.Println(err.Error())
+		Log(err.Error())
 		return err
 	}
 
@@ -248,7 +441,7 @@ func Start(r *RAFT) error {
 
 	listen, err := net.Listen("tcp", ":"+r.port)
 	if err != nil {
-		log.Println(err.Error())
+		Log(err.Error())
 		return err
 	}
 
@@ -265,10 +458,10 @@ func Start(r *RAFT) error {
 
 		err = http.Serve(listen, nil)
 
-		log.Println("Server End")
+		Log("server shut down!")
 
 		if err != nil {
-			log.Println(err.Error())
+			Log(err.Error())
 			return
 		}
 	}()

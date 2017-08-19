@@ -27,6 +27,9 @@ func main() {
 		return
 	}
 
+	// enable output debug infomation.
+	raft.Debug(true)
+
 	log.Println("Server start ok!")
 
 	// for test
@@ -38,7 +41,7 @@ func main() {
 
 		// run forever not to stop
 		time.Sleep(time.Duration(time.Second))
-		log.Println("pass ", i, " second.")
+		//log.Println("pass ", i, " second.")
 	}
 
 	log.Println("Server stop ok!")
