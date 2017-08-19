@@ -201,7 +201,7 @@ func TimeOut(r *RAFT) {
 			return
 		}
 
-		Log("[name: %s , role: %s , term: %d , leader: %s]", r.name, r.role, r.curTerm, r.leader)
+		Log("name: " + r.name + " role: " + r.role + " term: " + string(r.curTerm) + " leader: " + r.leader)
 
 		switch r.role {
 		case ROLE_LEADER:
