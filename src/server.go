@@ -3,6 +3,7 @@ package raft
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -201,7 +202,9 @@ func TimeOut(r *RAFT) {
 			return
 		}
 
-		Log("name: " + r.name + " role: " + r.role + " term: " + string(r.curTerm) + " leader: " + r.leader)
+		log := fmt.Sprintf("name: %s , role: %s , term: %d , leader: %s ",
+			r.name, r.role, r.curTerm, r.leader)
+		Log(log)
 
 		switch r.role {
 		case ROLE_LEADER:
