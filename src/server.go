@@ -51,6 +51,10 @@ type RAFT struct {
 	wait *sync.WaitGroup
 }
 
+func (r *RAFT) GetLogFileName() string {
+	return fmt.Sprintf("runlog_%s.txt", r.port)
+}
+
 func Log(v ...interface{}) {
 	if debug == true {
 		log.Println(v)
