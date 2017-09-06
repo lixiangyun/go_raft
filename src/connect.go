@@ -1,6 +1,7 @@
 package raft
 
 import (
+	"encoding/binary"
 	"errors"
 	"log"
 	"net/rpc"
@@ -9,13 +10,46 @@ import (
 )
 
 const (
-	PING_TIMEOUT = 2 * time.Second
+	PACKET_TYPE_PING     = 0
+	PACKET_TYPE_KEEPLIVE = 1
+	PACKET_TYPE_VOTE     = 2
+	PACKET_TYPE_APPENT   = 3
 )
+
+const (
+	PING_TIMEOUT = 1 * time.Second
+)
+
+// 报文序列化
+func CodePacket(req interface{}) ([]byte, error) {
+	iobuf := new(bytes.Buffer)
+
+	err := binary.Write(iobuf, binary.BigEndian, req)
+	if err != nil {
+		return nil, err
+	}
+
+	//log.Println("REQ: ", req)
+	//log.Println("SEND_BUF: ", iobuf.Len(), iobuf.Bytes())
+
+	return iobuf.Bytes(), nil
+}
+
+// 报文反序列化
+func DecodePacket(buf []byte) (rsp interface{}, err error) {
+
+	iobuf := bytes.NewReader(buf)
+	err = binary.Read(iobuf, binary.BigEndian, &rsp)
+
+	//log.Println("RSP: ", rsp)
+	//log.Println("RECV_BUF:", len(buf), buf)
+
+	return
+}
 
 type Node struct {
 	enable bool
 	name   string
-	client *rpc.Client
 }
 
 type Cluster struct {

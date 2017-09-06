@@ -48,9 +48,6 @@ func main() {
 		return
 	}
 
-	// enable output debug infomation.
-	raft.Debug(true)
-
 	log.Println("Server start ok!")
 
 	// for test

@@ -29,8 +29,6 @@ type LeaderInfo struct {
 	Term       uint64
 }
 
-var debug bool
-
 type RAFT struct {
 	role string
 	port string
@@ -56,9 +54,7 @@ func (r *RAFT) GetLogFileName() string {
 }
 
 func Log(v ...interface{}) {
-	if debug == true {
-		log.Println(v)
-	}
+	log.Println(v)
 }
 
 func GetRandInt() int {
@@ -396,10 +392,6 @@ func LeaderVote(r *RAFT) {
 
 		Log("leader vote failed! not enough partners. totalnum: ", totalnum, " agreenum: ", agreenum)
 	}
-}
-
-func Debug(b bool) {
-	debug = b
 }
 
 func NewRaft(selfaddr string, otheraddr []string) (*RAFT, error) {
