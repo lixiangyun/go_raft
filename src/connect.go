@@ -47,29 +47,43 @@ func DecodePacket(buf []byte) (rsp interface{}, err error) {
 	return
 }
 
+type VotePacket struct {
+	Type   byte
+	Term   uint64
+	Leader string
+}
+
 type Node struct {
 	enable bool
-	name   string
+	addr   string
 }
 
 type Cluster struct {
-	num   int
-	node  map[string]*Node
-	lock  *sync.Mutex
-	wait  *sync.WaitGroup
-	timer *time.Timer
-	flag  bool
+	member map[string]*Node
+	lock   *sync.Mutex
+	wait   *sync.WaitGroup
+	timer  *time.Timer
 }
 
-func NewCluster() *Cluster {
+func NewCluster(member []string) *Cluster {
 	c := new(Cluster)
 
-	c.num = 0
 	c.lock = new(sync.Mutex)
 	c.wait = new(sync.WaitGroup)
 	c.node = make(map[string]*Node)
 	c.timer = time.NewTimer(PING_TIMEOUT)
-	c.flag = true
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	for _, v := range member {
+
+		newnode := new(Node)
+		newnode.enable = false
+		newnode.addr = v
+
+		c.node[name] = newnode
+	}
 
 	go KeepConnect(c)
 
@@ -78,7 +92,11 @@ func NewCluster() *Cluster {
 	return c
 }
 
-func (c *Cluster) Close() {
+func (c *Cluster) Start() {
+
+}
+
+func (c *Cluster) Stop() {
 
 	for _, node := range c.node {
 		if node == nil {
@@ -120,10 +138,9 @@ func (c *Cluster) AddNode(name string) {
 
 	newnode := new(Node)
 	newnode.enable = false
-	newnode.name = name
+	newnode.addr = name
 
 	c.node[name] = newnode
-	c.num++
 }
 
 func (c *Cluster) DelNode(name string) {
@@ -144,7 +161,6 @@ func (c *Cluster) DelNode(name string) {
 	}
 
 	delete(c.node, name)
-	c.num--
 }
 
 func KeepConnect(c *Cluster) {
