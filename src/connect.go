@@ -1,7 +1,6 @@
 package raft
 
 import (
-	"encoding/binary"
 	"errors"
 	"log"
 	"net/rpc"
@@ -20,33 +19,6 @@ const (
 	PING_TIMEOUT = 1 * time.Second
 )
 
-// 报文序列化
-func CodePacket(req interface{}) ([]byte, error) {
-	iobuf := new(bytes.Buffer)
-
-	err := binary.Write(iobuf, binary.BigEndian, req)
-	if err != nil {
-		return nil, err
-	}
-
-	//log.Println("REQ: ", req)
-	//log.Println("SEND_BUF: ", iobuf.Len(), iobuf.Bytes())
-
-	return iobuf.Bytes(), nil
-}
-
-// 报文反序列化
-func DecodePacket(buf []byte) (rsp interface{}, err error) {
-
-	iobuf := bytes.NewReader(buf)
-	err = binary.Read(iobuf, binary.BigEndian, &rsp)
-
-	//log.Println("RSP: ", rsp)
-	//log.Println("RECV_BUF:", len(buf), buf)
-
-	return
-}
-
 type VotePacket struct {
 	Type   byte
 	Term   uint64
@@ -59,10 +31,10 @@ type Node struct {
 }
 
 type Cluster struct {
-	member map[string]*Node
-	lock   *sync.Mutex
-	wait   *sync.WaitGroup
-	timer  *time.Timer
+	node  map[string]*Node
+	lock  *sync.Mutex
+	wait  *sync.WaitGroup
+	timer *time.Timer
 }
 
 func NewCluster(member []string) *Cluster {
@@ -82,7 +54,7 @@ func NewCluster(member []string) *Cluster {
 		newnode.enable = false
 		newnode.addr = v
 
-		c.node[name] = newnode
+		c.node[v] = newnode
 	}
 
 	go KeepConnect(c)
